@@ -10,9 +10,9 @@ var out = {},
 var grid = codegrid.CodeGrid();
 
 var rawpos = 0,
-    rawkeys = Object.keys(raw);
-    rawlen = rawkeys.length;
-    rawdone = 0;
+    rawkeys = Object.keys(raw),
+    rawlen = rawkeys.length,
+    rawdone = 0,
     rawtotal = rawlen;
 
 correctNames = buildReverseIndex(canon);
