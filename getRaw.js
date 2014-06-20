@@ -15,6 +15,7 @@ var input_filename = process.argv[2],
     output_filename = 'topNames.json',
     osmKeys = ['amenity', 'shop'],
     counts = {},
+    count = 0,
     THRESHOLD = process.argv[3] || 50;
 
 handler.options({"tagged_nodes_only": true});
@@ -22,6 +23,8 @@ handler.on('node', takeTags);
 handler.on('way', takeTags);
 
 function takeTags(entity) {
+    count ++;
+    if (!(count%100000)) console.error (count);
     if (entity.tags && entity.tags('name')) {
         var tags = entity.tags();
         for (var key in tags) {
@@ -44,6 +47,7 @@ function done() {
             out[key] = counts[key];
         }
     }
+    console.error('count = ' + count);
     console.error('> ' + THRESHOLD + ': ' + Object.keys(out).length);
     fs.writeFileSync(output_filename, JSON.stringify(out, null, 4));
 }

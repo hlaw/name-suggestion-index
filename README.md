@@ -51,5 +51,8 @@ directly will be overwritten
     - `sudo apt-get update`
     - `sudo apt-get install nodejs`
     - `npm install`
-- `node getRaw yourOSMfile`
+- Download the osmium library and dependencies (http://osmcode.org/libosmium/)
+- Build the `osmium_getraw` program
+    - See `getraw/README.md` for details
+- `getraw/osmium_getraw yourOSMfile > topNames.json`
     - results will go in `topNames.json`

@@ -2,13 +2,27 @@ var fs = require('fs'),
     filter = require('./filter.json'),
     raw = require('./topNames.json'),
     canon = require('./canonical.json'),
-    correctNames = buildReverseIndex(canon);
+    codegrid = require('codegrid-js');
 
 var out = {},
     defined = {};
 
-for (var fullName in raw) {
-    filterValues(fullName);
+var grid = codegrid.CodeGrid();
+
+var rawpos = 0,
+    rawkeys = Object.keys(raw);
+    rawlen = rawkeys.length;
+    rawdone = 0;
+    rawtotal = rawlen;
+
+correctNames = buildReverseIndex(canon);
+
+function handlenames() {
+    if (rawpos < rawlen) {
+        filterValues(rawkeys[rawpos]);
+        rawpos++;
+    }
+    if (rawpos < rawlen) setImmediate(handlenames);
 }
 
 function buildReverseIndex(canon) {
@@ -30,51 +44,98 @@ function filterValues(fullName) {
         key = tag[0],
         value = tag[1];
     theName = theName[1];
-    if (filter.wanted[key] &&
-        filter.wanted[key].indexOf(value) !== -1 &&
-        filter.discardedNames.indexOf(theName) == -1) {
+    if (filter.discardedNames.indexOf(theName) == -1) {
         if (correctNames[theName]) theName = correctNames[theName];
-        set(key, value, theName, raw[fullName]);
+        getCodes (raw[fullName].loc, function (err, res){
+            if (!err) {
+               set(key, value, theName, res);
+               rawdone ++;
+               if (rawdone == rawtotal) done();
+            }
+        });
+    } else {
+        rawtotal--;
+        if (rawdone == rawtotal) done();
     }
 }
 
-function set(k, v, name, count) {
-    if (!out[k]) out[k] = {};
-    if (!out[k][v]) out[k][v] = {};
-    if (!out[k][v][name]) {
+function getCodes (locarray, cb)  {
+       var code;
+       var locmap = {};
+       var completed = 0;
+       var len = locarray.length;
+
+       codehandle = function (err, code) {
+           if (code && (code !== "None")) {
+               if (typeof locmap[code] !== "undefined") {
+                   locmap[code] ++;
+               } else {
+                   locmap[code] = 1;
+               }
+           }
+           completed++;
+           if (completed === len) {
+               cb (null, locmap);
+           }
+       };
+
+       for (var i=0; i<len; i++) {
+           grid.getCode (locarray[i].lat, locarray[i].lng, codehandle);
+       }
+}
+
+function set(k, v, name, locmap) {
+    for (var c in locmap) {
+        setc(c, k, v, name, locmap[c]);
+    }
+}
+
+function setc(c, k, v, name, count) {
+    if (!out[c]) out[c] = {};
+    if (!out[c][k]) out[c][k] = {};
+    if (!out[c][k][v]) out[c][k][v] = {};
+    if (!out[c][k][v][name]) {
         if (canon[name] && canon[name].nix_value) {
             for (var i = 0; i < canon[name].nix_value.length; i++) {
                 if (canon[name].nix_value[i] == v) return;
             }
         }
 
-        if (defined[name]) {
-            var string = name;
-            for (var i = 0; i < defined[name].length; i++) {
-                string += '\n\t in ' + defined[name][i] + ' - ';
-                var kv = defined[name][i].split('/');
-                string += out[kv[0]][kv[1]][name].count + ' times';
+        if (defined[c] && defined[c][name]) {
+            var string = name + ' (' + c + ')';
+            for (var i = 0; i < defined[c][name].length; i++) {
+                string += '\n\t in ' + defined[c][name][i] + ' - ';
+                var kv = defined[c][name][i].split('/');
+                string += out[c][kv[0]][kv[1]][name].count + ' times';
             }
             console.log(string + '\n\t and ' + k + '/' + v + ' - ' + count + ' times');
         }
 
-        out[k][v][name] = {count: count};
-        if (defined[name]) {
-            defined[name].push(k + '/' + v);
+        out[c][k][v][name] = {count:  count};
+        if (defined[c] && defined[c][name]) {
+            defined[c][name].push(k + '/' + v);
+        } else if (defined[c]){
+            defined[c][name] = [k + '/' + v];
         } else {
-            defined[name] = [k + '/' + v];
+            defined[c] = {};
+            defined[c][name] = [k + '/' + v];
         }
     } else {
-        out[k][v][name].count += count;
+        out[c][k][v][name].count += count;
     }
 
     if (canon[name]) {
         for (var tag in canon[name].tags) {
-            if (!out[k][v][name].tags) out[k][v][name].tags = {};
-            out[k][v][name].tags[tag] = canon[name].tags[tag];
+            if (!out[c][k][v][name].tags) out[c][k][v][name].tags = {};
+            out[c][k][v][name].tags[tag] = canon[name].tags[tag];
         }
     }
 }
 
-fs.writeFileSync('name-suggestions.json', JSON.stringify(out, null, 4));
-fs.writeFileSync('name-suggestions.min.json', JSON.stringify(out));
+function done () {
+    fs.writeFileSync('name-suggestions.json', JSON.stringify(out, null, 4));
+    fs.writeFileSync('name-suggestions.min.json', JSON.stringify(out));
+}
+
+handlenames();
+

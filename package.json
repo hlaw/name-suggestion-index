@@ -16,7 +16,8 @@
     "names"
   ],
   "dependencies": {
-    "osmium": "0.1.x"
+    "osmium": "0.1.x",
+    "codegrid-js" : "git://github.com/hlaw/codegrid-js.git"
   },
   "author": "Aaron Lidman",
   "license": "BSD"
